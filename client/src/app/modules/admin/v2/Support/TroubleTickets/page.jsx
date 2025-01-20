@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../../layout/page';
 import { FaTicketAlt, FaPlus, FaTabletAlt, FaTencentWeibo, FaIdCard, FaReact, FaRecordVinyl, FaStreetView, FaUpload, FaBitcoin, FaServicestack } from 'react-icons/fa';
+import axios from 'axios';
 
 const FollowUp = () => {
   const [followUpData, setFollowUpData] = useState([]);
@@ -9,54 +10,78 @@ const FollowUp = () => {
   const [filterStatus, setFilterStatus] = useState('All'); // Filter status
   const [searchQuery, setSearchQuery] = useState(''); // Search by issue
 
+  // useEffect(() => {
+  //   setLoading(true);
+
+  //   const mockFollowUps = [
+  //     {
+  //       id: '1',
+  //       customerId: '123',
+  //       issue: 'Slow network speed',
+  //       followupStatus: 'Pending',
+  //       priority: 'High',
+  //     },
+  //     {
+  //       id: '2',
+  //       customerId: '124',
+  //       issue: 'Unable to connect to VPN',
+  //       followupStatus: 'Process',
+  //       priority: 'Medium',
+  //     },
+  //     {
+  //       id: '3',
+  //       customerId: '125',
+  //       issue: 'Frequent disconnections',
+  //       followupStatus: 'Completed',
+  //       priority: 'Low',
+  //     },
+  //   ];
+
+  //   const mockCustomerData = {
+  //     '123': {
+  //       accountManager: 'John Doe',
+  //       supportEngineer: 'Jane Smith',
+  //     },
+  //     '124': {
+  //       accountManager: 'Sarah Connor',
+  //       supportEngineer: 'Kyle Reese',
+  //     },
+  //     '125': {
+  //       accountManager: 'James Cameron',
+  //       supportEngineer: 'Ellen Ripley',
+  //     },
+  //   };
+
+  //   setTimeout(() => {
+  //     setFollowUpData(mockFollowUps);
+  //     setCustomerData(mockCustomerData);
+  //     setLoading(false);
+  //   }, 1000);
+  // }, []);
+
   useEffect(() => {
-    setLoading(true);
-
-    const mockFollowUps = [
-      {
-        id: '1',
-        customerId: '123',
-        issue: 'Slow network speed',
-        followupStatus: 'Pending',
-        priority: 'High',
-      },
-      {
-        id: '2',
-        customerId: '124',
-        issue: 'Unable to connect to VPN',
-        followupStatus: 'Process',
-        priority: 'Medium',
-      },
-      {
-        id: '3',
-        customerId: '125',
-        issue: 'Frequent disconnections',
-        followupStatus: 'Completed',
-        priority: 'Low',
-      },
-    ];
-
-    const mockCustomerData = {
-      '123': {
-        accountManager: 'John Doe',
-        supportEngineer: 'Jane Smith',
-      },
-      '124': {
-        accountManager: 'Sarah Connor',
-        supportEngineer: 'Kyle Reese',
-      },
-      '125': {
-        accountManager: 'James Cameron',
-        supportEngineer: 'Ellen Ripley',
-      },
-    };
-
-    setTimeout(() => {
-      setFollowUpData(mockFollowUps);
-      setCustomerData(mockCustomerData);
-      setLoading(false);
-    }, 1000);
+    fetchData();
   }, []);
+
+  const fetchData = async () => {
+    try {
+      const [followUpResponse, customerResponse] = await Promise.all([
+        axios.get("http://localhost:5000/v3/api/followups"),
+        axios.get("http://localhost:5000/v3/api/customers")
+      ]);
+  
+      const followUpCustomerIds = followUpResponse.data.map(followUp => followUp.customerId);
+
+      const filteredCustomers = customerResponse.data.filter(customer => 
+        followUpCustomerIds.includes(customer.id)
+      );
+      setFollowUpData(followUpResponse.data);
+      setCustomerData(filteredCustomers);
+  
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
+  }
 
   const totalTickets = followUpData.length;
   const liveTickets = followUpData.filter((ticket) => ticket.followupStatus === 'Process').length;
