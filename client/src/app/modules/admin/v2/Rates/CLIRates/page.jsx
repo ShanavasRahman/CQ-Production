@@ -5,7 +5,7 @@ import axios from 'axios';
 import adminContext from '../../../../../../context/page';
 
 const Modal = ({ isOpen, onClose, onSubmit, initialData }) => {
-  const [newLead, setNewLead] = useState(initialData || {
+  const dataModel={
     countryCode: '',
     country: '',
     qualityDescription: '',
@@ -17,44 +17,21 @@ const Modal = ({ isOpen, onClose, onSubmit, initialData }) => {
     acd: '',
     ticker: false, 
     testStatus: 'na',
-  });
+  }
+  const [newLead, setNewLead] = useState(initialData || dataModel);
 
   useEffect(() => {
     if (initialData) {
       setNewLead(initialData);
     } else {
-      setNewLead({
-        countryCode: '',
-        country: '',
-        qualityDescription: '',
-        rate: '',
-        status: 'Inactive',
-        billingCycle: '',
-        rtp: '',
-        asr: '',
-        acd: '',
-        testStatus: 'na',
-        ticker: false,
-      });
+      setNewLead(dataModel);
     }
   }, [initialData]);
 
   const handleAddLead = (e) => {
     e.preventDefault();
     onSubmit(newLead);
-    setNewLead({
-      countryCode: '',
-      country: '',
-      qualityDescription: '',
-      rate: '',
-      status: 'Inactive',
-      billingCycle: '',
-      rtp: '',
-      asr: '',
-      acd: '',
-      testStatus: 'na',
-      ticker: false,
-    });
+    setNewLead(dataModel);
   };
 
   if (!isOpen) return null;
@@ -101,10 +78,12 @@ const Modal = ({ isOpen, onClose, onSubmit, initialData }) => {
 };
 
 const RatesPage = () => {
-  const {adminDetails} = useContext(adminContext)
+  const { adminDetails } = useContext(adminContext);
   const [rateData, setRateData] = useState([]);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('country');
+  const [selectedCountry, setSelectedCountry] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [isUpdateMode, setIsUpdateMode] = useState(false);
   const [currentRate, setCurrentRate] = useState(null);
@@ -114,7 +93,7 @@ const RatesPage = () => {
   useEffect(() => {
     const fetchRates = async () => {
       try {
-        const response = await axios.get('https://backend.cloudqlobe.com/v3/api/clirates');
+        const response = await axios.get('http://localhost:5000/v3/api/clirates');
         setRateData(response.data);
       } catch (error) {
         console.error('Error fetching rates:', error);
@@ -123,28 +102,30 @@ const RatesPage = () => {
     fetchRates();
   }, []);
 
-  const filteredData = rateData.filter((rate) => {
-    const country = rate.country || '';
-    const qualityDescription = rate.qualityDescription || '';
-    return country.toLowerCase().includes(search.toLowerCase()) || qualityDescription.toLowerCase().includes(search.toLowerCase());
-  });
-
-  const sortedData = filteredData.sort((a, b) => {
-    if (sort === 'country') return a.country.localeCompare(b.country);
-    if (sort === 'rate') return a.rate - b.rate;
-    return 0;
-  });
+  const filteredData = rateData
+    .filter((rate) => 
+      rate.country.toLowerCase().includes(search.toLowerCase()) ||
+      rate.qualityDescription.toLowerCase().includes(search.toLowerCase())
+    )
+    .filter((rate) => 
+      (selectedCountry ? rate.country.toLowerCase() === selectedCountry.toLowerCase() : true) &&
+      (selectedStatus ? rate.status.toLowerCase() === selectedStatus.toLowerCase() : true)
+    )
+    .sort((a, b) => {
+      if (sort === 'country') return a.country.localeCompare(b.country);
+      if (sort === 'rate') return a.rate - b.rate;
+      return 0;
+    });
 
   const handleAddLead = async (leadData) => {
     try {
       let response;
       if (isUpdateMode) {
-        response = await axiosInstance.put(`v3/api/clirates/${currentRate._id}`, leadData);
+        response = await axiosInstance.put(`http://localhost:5000/v3/api/clirates/${currentRate._id}`, leadData);
       } else {
-        response = await axiosInstance.post('v3/api/clirates', leadData);
-        
+        response = await axiosInstance.post('http://localhost:5000/v3/api/clirates', leadData);
         if (leadData.ticker) {
-          await axiosInstance.post('/v3/api/clt', { rateids: [response.data._id] });
+          await axiosInstance.post('http://localhost:5000/v3/api/clt', { rateids: [response.data._id] });
         }
       }
       setRateData((prev) => 
@@ -172,7 +153,7 @@ const RatesPage = () => {
 
   const handleDeleteClick = async (rateId) => {
     try {
-      await axiosInstance.delete(`v3/api/clirates/${rateId}`);
+      await axiosInstance.delete(`http://localhost:5000/v3/api/clirates/${rateId}`);
       setRateData((prev) => prev.filter(rate => rate._id !== rateId));
       setSuccessMessage('Rate deleted successfully!');
       setErrorMessage('');
@@ -189,16 +170,51 @@ const RatesPage = () => {
         <h2 className="text-xl font-bold">CLI Rates</h2>
         {successMessage && <div className="text-green-600">{successMessage}</div>}
         {errorMessage && <div className="text-red-600">{errorMessage}</div>}
-        
-        <div className="flex items-center mb-4">
-          <input type="text" placeholder="Search by country or quality description" value={search} onChange={(e) => setSearch(e.target.value)} className="border border-gray-300 rounded-lg px-4 py-2 mr-2" />
-          
-          {['superAdmin', "account"].includes(adminDetails.role) && (
-          <button onClick={() => { setIsUpdateMode(false); setModalOpen(true); }} className="bg-blue-500 text-white px-4 py-2 rounded-lg">Add Rate</button>
-          )}
 
-          </div>
-        <select onChange={(e) => setSort(e.target.value)} className="border border-gray-300 rounded-lg px-4 py-2 mb-4">
+        <div className="flex items-center mb-4">
+          <input 
+            type="text" 
+            placeholder="Search by country or quality description" 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
+            className="border border-gray-300 rounded-lg px-4 py-2 mr-2" 
+          />
+
+          <select 
+            onChange={(e) => setSelectedCountry(e.target.value)} 
+            value={selectedCountry}
+            className="border border-gray-300 rounded-lg px-4 py-2 mr-2"
+          >
+            <option value="">Filter by Country</option>
+            {[...new Set(rateData.map((rate) => rate.country))].map((country) => (
+              <option key={country} value={country}>{country}</option>
+            ))}
+          </select>
+
+          <select 
+            onChange={(e) => setSelectedStatus(e.target.value)} 
+            value={selectedStatus}
+            className="border border-gray-300 rounded-lg px-4 py-2 mr-2"
+          >
+            <option value="">Filter by Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+
+          {['superAdmin', "account"].includes(adminDetails.role) && (
+            <button 
+              onClick={() => { setIsUpdateMode(false); setModalOpen(true); }} 
+              className="bg-blue-500 text-white px-4 py-2 rounded-lg"
+            >
+              Add Rate
+            </button>
+          )}
+        </div>
+
+        <select 
+          onChange={(e) => setSort(e.target.value)} 
+          className="border border-gray-300 rounded-lg px-4 py-2 mb-4"
+        >
           <option value="country">Sort by Country</option>
           <option value="rate">Sort by Rate</option>
         </select>
@@ -212,29 +228,31 @@ const RatesPage = () => {
               <th className="px-4 py-2">Rate</th>
               <th className="px-4 py-2">Status</th>
               {['superAdmin', "account"].includes(adminDetails.role) && (
-              <th className="px-4 py-2">Actions</th>
+                <th className="px-4 py-2">Actions</th>
               )}
             </tr>
           </thead>
           <tbody>
-            {sortedData.map((rate, index) => (
+            {filteredData.map((rate, index) => (
               <tr key={rate._id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-100'}>
                 <td className="px-4 py-2">{rate.countryCode}</td>
                 <td className="px-4 py-2">{rate.country}</td>
                 <td className="px-4 py-2">{rate.qualityDescription}</td>
                 <td className="px-4 py-2">{rate.rate}</td>
-                <td className={`px-4 py-2 ${rate.status === 'Active' ? 'text-green-600' : 'text-red-600'}`}>{rate.status}</td>
-                {['superAdmin', "account"].includes(adminDetails.role) && (
-                <td className="px-4 py-2">
-                  <button onClick={() => handleUpdateClick(rate)} className="text-blue-500 hover:underline">Edit</button>
-                  <button onClick={() => handleDeleteClick(rate._id)} className="text-red-500 hover:underline ml-2">Delete</button>
+                <td className={`px-4 py-2 ${rate.status.toLowerCase() === 'active' ? 'text-green-600' : 'text-red-600'}`}>
+                  {rate.status}
                 </td>
+                {['superAdmin', "account"].includes(adminDetails.role) && (
+                  <td className="px-4 py-2">
+                    <button onClick={() => handleUpdateClick(rate)} className="text-blue-500 hover:underline">Edit</button>
+                    <button onClick={() => handleDeleteClick(rate._id)} className="text-red-500 hover:underline ml-2">Delete</button>
+                  </td>
                 )}
               </tr>
             ))}
           </tbody>
         </table>
-        
+
         <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} onSubmit={handleAddLead} initialData={currentRate} />
       </div>
     </Layout>
